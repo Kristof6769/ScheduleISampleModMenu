@@ -13,8 +13,9 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
-using UnityEngine.AI;
 
+//CREATED BY KRISTOF67//
+//MOD MENU FOR SCHEDULE I FREE SAMPLE//
 
 namespace ScheduleIMod
 {
@@ -85,7 +86,7 @@ namespace ScheduleIMod
         private Dictionary<string, ItemDefinition> allItemDefs = new Dictionary<string, ItemDefinition>();
         private bool itemListInitialized = false;
 
-        // Kategória filter (nincs EItemCategory.None, ezért külön bool)
+        // Kategória filter
         private bool itemCategoryFilterEnabled = false;
         private EItemCategory selectedItemCategory = EItemCategory.Product;
 
@@ -98,7 +99,6 @@ namespace ScheduleIMod
         private int productQuantity = 1;
         private bool filterDiscoveredOnly = false;
         private bool filterListedOnly = false;
-
 
         // ======================
         // UPDATE LOOP
@@ -450,7 +450,6 @@ namespace ScheduleIMod
                 if (npcEspEnabled)
                     DrawNPCESP();
 
-
                 return;
             }
 
@@ -507,7 +506,7 @@ namespace ScheduleIMod
                 case 4: DrawUtilityTab(); break;
                 case 5: DrawSkinTab(); break;
                 case 6: DrawItemSpawnerTab(); break;
-                case 7: DrawProductDebugTab(); break;
+                case 7: DrawProductTab(); break;
             }
         }
 
@@ -624,7 +623,10 @@ namespace ScheduleIMod
             GUILayout.Label("<size=16><b>ESP</b></size>", labelStyle);
             GUILayout.Space(10);
 
-            npcEspEnabled = GUILayout.Toggle(npcEspEnabled, " NPC ESP (Name + Dist + Box + HP)\nPets = cyan, normál NPC = green");
+            npcEspEnabled = GUILayout.Toggle(
+                npcEspEnabled,
+                " NPC ESP (Name + Dist + Box + HP)\nPets = cyan, normál NPC = green"
+            );
         }
 
         // ======================
@@ -662,104 +664,232 @@ namespace ScheduleIMod
             if (GUILayout.Button("Neon Hacker Style")) currentSkin = SkinType.Neon;
         }
 
-        private void DrawProductDebugTab()
+        // ======================
+        // PRODUCT TAB (Product Giver)
+        // ======================
+        private void DrawProductTab()
         {
+            GUILayout.Label("<size=16><b>Product Giver</b></size>", labelStyle);
+            GUILayout.Space(10);
+
             var pm = NetworkSingleton<ProductManager>.Instance;
             if (pm == null)
             {
-                GUILayout.Label("ProductManager not found (nincs játék betöltve?)");
+                GUILayout.Label("ProductManager not available (not in this scene?)");
                 return;
             }
 
-            GUILayout.Label("<b>PRODUCT DEBUG MODE</b>", _headerStyle ?? GUI.skin.label);
-            GUILayout.Space(5f);
-            GUILayout.Label("Itt mindent fel tudsz oldani / listázni / spawnolni (csak debugra).");
+            // Quantity slider
+            GUILayout.Label($"Quantity: {productQuantity}");
+            productQuantity = (int)GUILayout.HorizontalSlider(productQuantity, 1, 500);
 
-            GUILayout.Space(10f);
+            GUILayout.Space(10);
+            GUILayout.Label("<b>Filters</b>", labelStyle);
 
-            // ─────────────────────────────────────────────
-            // GLOBAL DEBUG GOMBOK
-            // ─────────────────────────────────────────────
+            filterDiscoveredOnly = GUILayout.Toggle(filterDiscoveredOnly, " Show only DISCOVERED products");
+            filterListedOnly = GUILayout.Toggle(filterListedOnly, " Show only LISTED products");
 
-            if (GUILayout.Button("★ Discover + LIST ALL PRODUCTS (full unlock)", GUILayout.Height(30f)))
+            GUILayout.Space(10);
+
+            GUILayout.Label("Search:");
+            productSearch = GUILayout.TextField(productSearch, 50);
+
+            GUILayout.Space(10);
+
+            productScrollPos = GUILayout.BeginScrollView(productScrollPos, GUILayout.Width(550), GUILayout.Height(300));
+
+            List<ProductDefinition> products = pm.AllProducts;
+            string searchLower = string.IsNullOrEmpty(productSearch) ? null : productSearch.ToLower();
+
+            foreach (var prod in products)
             {
-                foreach (var p in pm.AllProducts)
+                if (prod == null) continue;
+
+                // SEARCH filter
+                if (!string.IsNullOrEmpty(searchLower))
                 {
-                    // conn = null, productID = p.ID, autoList = true
-                    pm.SetProductDiscovered(null, p.ID, true);
+                    if (!prod.Name.ToLower().Contains(searchLower) &&
+                        !prod.ID.ToLower().Contains(searchLower))
+                        continue;
                 }
 
-                Debug.Log("[ModMenu] Product Debug: összes termék felfedezve és listázva.");
-            }
+                // DISCOVERED filter
+                if (filterDiscoveredOnly && !ProductManager.DiscoveredProducts.Contains(prod))
+                    continue;
 
-            if (GUILayout.Button("✖ Clear Discovered/List status (csak local listák)", GUILayout.Height(25f)))
-            {
-                ProductManager.DiscoveredProducts.Clear();
-                ProductManager.ListedProducts.Clear();
-                Debug.Log("[ModMenu] Product Debug: DiscoveredProducts + ListedProducts ürítve (local).");
-            }
+                // LISTED filter
+                if (filterListedOnly && !ProductManager.ListedProducts.Contains(prod))
+                    continue;
 
-            GUILayout.Space(10f);
-            GUILayout.Label("Egyedi termékek:");
+                GUILayout.BeginHorizontal("box");
 
-            // ─────────────────────────────────────────────
-            // PER-PRODUCT LISTA
-            // ─────────────────────────────────────────────
+                // Icon
+                Texture2D iconTex = prod.Icon != null ? prod.Icon.texture : Texture2D.blackTexture;
+                GUILayout.Label(iconTex, GUILayout.Width(40), GUILayout.Height(40));
 
-            _productScroll = GUILayout.BeginScrollView(_productScroll, GUILayout.Height(400f));
+                // Text info
+                GUILayout.BeginVertical();
+                GUILayout.Label("<b>" + prod.Name + "</b>", labelStyle);
+                GUILayout.Label("<size=11>" + prod.ID + "</size>");
+                GUILayout.Label($"Type: {prod.DrugType}   BaseValue: {prod.MarketValue}");
+                GUILayout.EndVertical();
 
-            foreach (var p in pm.AllProducts)
-            {
-                if (p == null) continue;
+                GUILayout.FlexibleSpace();
 
-                bool discovered = ProductManager.DiscoveredProducts.Contains(p);
-                bool listed = ProductManager.ListedProducts.Contains(p);
-
-                GUILayout.BeginHorizontal();
-
-                // Név + ID
-                GUILayout.Label($"{p.Name}  ({p.ID})", GUILayout.Width(260f));
-
-                // State label-ek
-                GUILayout.Label(discovered ? "Discovered" : "Hidden", GUILayout.Width(80f));
-                GUILayout.Label(listed ? "Listed" : "Unlisted", GUILayout.Width(80f));
-
-                // Felfedezés (autoList = false)
-                if (GUILayout.Button("Discover", GUILayout.Width(90f)))
+                // GIVE (inventory)
+                if (GUILayout.Button("Give", GUILayout.Width(70)))
                 {
-                    pm.SetProductDiscovered(null, p.ID, false);
-                }
-
-                // Felfedezés + automatikus listázás (autoList = true)
-                if (GUILayout.Button("Discover+List", GUILayout.Width(110f)))
-                {
-                    pm.SetProductDiscovered(null, p.ID, true);
-                }
-
-                // Unlist
-                if (GUILayout.Button("Unlist", GUILayout.Width(70f)))
-                {
-                    pm.SetProductListed(p.ID, false);
-                }
-
-                // Give 1 db item a playernek
-                if (GUILayout.Button("Give x1", GUILayout.Width(70f)))
-                {
-                    var def = Registry.GetItem<ProductDefinition>(p.ID);
-                    if (def != null)
+                    try
                     {
-                        PlayerSingleton<PlayerInventory>.Instance
-                            .AddItemToInventory(def.GetDefaultInstance(1));
+                        var inv = PlayerSingleton<PlayerInventory>.Instance;
+                        if (inv == null)
+                        {
+                            MelonLogger.Warning("[ProductGiver] PlayerInventory.Instance is null.");
+                        }
+                        else
+                        {
+                            var inst = prod.GetDefaultInstance(productQuantity);
+                            inv.AddItemToInventory(inst);
+                            MelonLogger.Msg($"[ProductGiver] Gave {productQuantity}x {prod.Name}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Warning("[ProductGiver] Give failed: " + ex.Message);
+                    }
+                }
+
+                // DROP
+                if (GUILayout.Button("Drop", GUILayout.Width(60)))
+                {
+                    SpawnPickup(prod); // ProductDefinition : ItemDefinition
+                }
+
+                // EQUIP
+                if (GUILayout.Button("Equip", GUILayout.Width(60)))
+                {
+                    EquipItemViaInventory(prod);
+                }
+
+                // DISCOVER (csak discovered-be teszi, autoList=false)
+                if (GUILayout.Button("Discover", GUILayout.Width(80)))
+                {
+                    try
+                    {
+                        pm.SetProductDiscovered(null, prod.ID, false);
+                        MelonLogger.Msg($"[Product] DISCOVERED: {prod.Name}");
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Warning("[Product] Discover failed: " + ex.Message);
+                    }
+                }
+
+                // HIDE (eltávolítjuk a discovered + listed listákból local szinten)
+                if (GUILayout.Button("Hide", GUILayout.Width(80)))
+                {
+                    ProductManager.DiscoveredProducts.Remove(prod);
+                    ProductManager.ListedProducts.Remove(prod);
+                    pm.HasChanged = true;
+                    MelonLogger.Msg($"[Product] HIDDEN (local): {prod.Name}");
+                }
+
+                if (GUILayout.Button("List", GUILayout.Width(80)))
+                {
+                    try
+                    {
+                        pm.SetProductListed(prod.ID, true);
+                        MelonLogger.Msg($"[Product] LISTED: {prod.Name}");
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Warning("[Product] List failed: " + ex.Message);
+                    }
+                }
+
+                if (GUILayout.Button("Delist", GUILayout.Width(80)))
+                {
+                    try
+                    {
+                        pm.SetProductListed(prod.ID, false);
+                        MelonLogger.Msg($"[Product] DELISTED: {prod.Name}");
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Warning("[Product] Delist failed: " + ex.Message);
                     }
                 }
 
                 GUILayout.EndHorizontal();
             }
 
+            GUILayout.Space(20);
+            GUILayout.Label("<b>Global Product Tools</b>", labelStyle);
+
+            if (GUILayout.Button("Discover + List ALL Products"))
+            {
+                try
+                {
+                    foreach (var p in pm.AllProducts)
+                    {
+                        if (p == null) continue;
+                        pm.SetProductDiscovered(null, p.ID, true);
+                    }
+
+                    MelonLogger.Msg("[Product] All products DISCOVERED + LISTED (via SetProductDiscovered autoList=true).");
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning("[Product] Discover/List ALL failed: " + ex.Message);
+                }
+            }
+
+            if (GUILayout.Button("Hide ALL Products (local)"))
+            {
+                ProductManager.DiscoveredProducts.Clear();
+                ProductManager.ListedProducts.Clear();
+                pm.HasChanged = true;
+                MelonLogger.Msg("[Product] All products HIDDEN locally (lists cleared).");
+            }
+
+            if (GUILayout.Button("List ALL Products"))
+            {
+                try
+                {
+                    foreach (var p in pm.AllProducts)
+                    {
+                        if (p == null) continue;
+                        pm.SetProductListed(p.ID, true);
+                    }
+
+                    MelonLogger.Msg("[Product] All products LISTED.");
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning("[Product] List ALL failed: " + ex.Message);
+                }
+            }
+
+            if (GUILayout.Button("Delist ALL Products"))
+            {
+                try
+                {
+                    foreach (var p in pm.AllProducts)
+                    {
+                        if (p == null) continue;
+                        pm.SetProductListed(p.ID, false);
+                    }
+
+                    MelonLogger.Msg("[Product] All products DELISTED.");
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning("[Product] Delist ALL failed: " + ex.Message);
+                }
+            }
+
             GUILayout.EndScrollView();
         }
-
-
 
         // ======================
         // ITEM SPAWNER TAB
@@ -862,7 +992,7 @@ namespace ScheduleIMod
                     }
                 }
 
-                // DROP (Single Drop – mindig 1 db pickup)
+                // DROP
                 if (GUILayout.Button("Drop", GUILayout.Width(60)))
                 {
                     SpawnPickup(def);
@@ -998,7 +1128,7 @@ namespace ScheduleIMod
                 }
 
                 // Equip hívása
-                inv.Equip(slots[index]);
+                slots[index].Equip();
 
                 // Protected setter megkerülése reflektálással
                 PropertyInfo prop = typeof(PlayerInventory).GetProperty(
