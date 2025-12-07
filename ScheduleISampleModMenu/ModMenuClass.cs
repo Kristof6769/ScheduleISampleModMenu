@@ -1,37 +1,56 @@
-﻿using MelonLoader;
+﻿using FishNet;
+using FishNet.Managing;
+using MelonLoader;
 using ScheduleOne.DevUtilities;
 using ScheduleOne.ItemFramework;
 using ScheduleOne.Money;
 using ScheduleOne.NPCs;
 using ScheduleOne.Persistence;
 using ScheduleOne.PlayerScripts;
-using ScheduleOne.Variables;
-using FishNet;
-using FishNet.Managing;
 using ScheduleOne.Product;
+using ScheduleOne.Variables;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
+using ScheduleOne.PlayerScripts.Health;
 
-//CREATED BY KRISTOF67//
-//MOD MENU FOR SCHEDULE I FREE SAMPLE//
+// CREATED BY KRISTOF67
+// MOD MENU FOR SCHEDULE I – FREE SAMPLE
 
 namespace ScheduleIMod
 {
     public class ModMenuClass : MelonMod
     {
-        private bool showGUI = true;
+        private bool showGUI = false;
         private int selectedTab = 0;
 
-        private Rect windowRect = new Rect(20, 20, 750, 450);
+        // Window position & size
+        private Rect windowRect = new Rect(40, 40, 750, 450);
 
+        // Resizing
+        private bool isResizing = false;
+        private Vector2 resizeStartMouse;
+        private Vector2 resizeStartSize;
+        private const float MinWindowWidth = 600f;
+        private const float MinWindowHeight = 350f;
+
+        // Theme
         private enum SkinType { Classic, Dark, Neon }
-        private SkinType currentSkin = SkinType.Classic;
+        private SkinType currentSkin = SkinType.Dark; // default to dark minimal
 
         private GUIStyle labelStyle;
+        private GUIStyle headerLabelStyle;
+        private GUIStyle sidebarButtonStyle;
+        private GUIStyle sidebarActiveButtonStyle;
+        private GUIStyle tabHeaderStyle;
         private GUIStyle espStyle;
+        private Texture2D darkBgTex;
+        private Texture2D darkerBgTex;
+        private Texture2D accentTex;
+        private Texture2D resizeHandleTex;
 
+        // Product debug scroll
         private Vector2 _productScroll;
 
         // ===== FLAGS =====
@@ -48,7 +67,7 @@ namespace ScheduleIMod
         private List<NPCHealth> cachedNPCs = new List<NPCHealth>();
         private float nextScanTime = 0f;
 
-        // ===== PET NPC-K =====
+        // ===== PET NPCs =====
         private List<NPCHealth> controlledNpcs = new List<NPCHealth>();
         private float petFollowSpeed = 5f;
 
@@ -64,7 +83,7 @@ namespace ScheduleIMod
         private enum BrainMode { Normal, Frozen, Panic }
         private BrainMode brainMode = BrainMode.Normal;
 
-        // NPCMovement → eredeti MoveSpeedMultiplier
+        // Original NPCMovement.MoveSpeedMultiplier
         private Dictionary<NPCMovement, float> originalMoveMultipliers = new Dictionary<NPCMovement, float>();
 
         // ===== THROWBACK NPC (RMB) =====
@@ -83,14 +102,14 @@ namespace ScheduleIMod
         private Vector2 itemScrollPos = Vector2.zero;
         private string itemSearch = "";
         private int itemQuantity = 1;
-        private Dictionary<string, ItemDefinition> allItemDefs = new Dictionary<string, ItemDefinition>();
+        private readonly Dictionary<string, ItemDefinition> allItemDefs = new Dictionary<string, ItemDefinition>();
         private bool itemListInitialized = false;
 
-        // Kategória filter
+        // Category filter
         private bool itemCategoryFilterEnabled = false;
         private EItemCategory selectedItemCategory = EItemCategory.Product;
 
-        // ===== PICKUP TEMPLATE (valódi ItemPickup mintája Drop-hoz) =====
+        // ===== PICKUP TEMPLATE (used for real item drops) =====
         private ItemPickup pickupTemplate;
 
         // ===== PRODUCT GIVER =====
@@ -149,7 +168,7 @@ namespace ScheduleIMod
             MelonLogger.Msg($"[ItemSpawner] Loaded {allItemDefs.Count} items.");
         }
 
-        // Pickup template keresése (első ItemPickup a pályán)
+        // Find pickup template (first ItemPickup in scene)
         private void EnsurePickupTemplate()
         {
             if (pickupTemplate != null) return;
@@ -165,7 +184,7 @@ namespace ScheduleIMod
             }
         }
 
-        // Valódi Drop: 1 db ItemPickup spawn a földre
+        // Spawn a real ItemPickup on the ground
         private void SpawnPickup(ItemDefinition def)
         {
             if (def == null)
@@ -189,11 +208,11 @@ namespace ScheduleIMod
 
             Transform player = PlayerMovement.Instance.transform;
 
-            // Kiinduló pozíció: játékos előtt kicsit
+            // Start position: a bit in front of the player
             Vector3 origin = player.position + player.forward * 1.5f + Vector3.up * 0.5f;
             Vector3 spawnPos = origin;
 
-            // Raycast lefele, hogy a talajra tegye
+            // Raycast down to place on ground
             if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 3f, ~0, QueryTriggerInteraction.Ignore))
             {
                 spawnPos = hit.point + Vector3.up * 0.05f;
@@ -203,7 +222,7 @@ namespace ScheduleIMod
             ItemPickup ip = go.GetComponent<ItemPickup>();
             if (ip != null)
             {
-                ip.ItemToGive = def;           // mit adjon felvételkor
+                ip.ItemToGive = def;
                 ip.DestroyOnPickup = true;
                 ip.Networked = pickupTemplate.Networked;
             }
@@ -414,6 +433,46 @@ namespace ScheduleIMod
             }
         }
 
+        // ===== PLAYER HEALTH HELPERS =====
+        private PlayerHealth GetLocalPlayerHealth()
+        {
+            if (Player.Local == null)
+                return null;
+
+            return Player.Local.GetComponent<PlayerHealth>();
+        }
+
+        private float GetPlayerHealth()
+        {
+            var h = GetLocalPlayerHealth();
+            return h != null ? h.CurrentHealth : 0f;
+        }
+
+        private void SetPlayerHealth(float value)
+        {
+            var h = GetLocalPlayerHealth();
+            if (h == null) return;
+
+            h.SetHealth(value);
+        }
+
+        private void HealPlayerFull()
+        {
+            var h = GetLocalPlayerHealth();
+            if (h == null) return;
+
+            h.SetHealth(PlayerHealth.MAX_HEALTH);
+        }
+
+        private void KillPlayer()
+        {
+            var h = GetLocalPlayerHealth();
+            if (h == null) return;
+
+            h.SetHealth(0f);
+        }
+
+
         // ======================
         // DELETE NPC (X)
         // ======================
@@ -426,7 +485,7 @@ namespace ScheduleIMod
                 Camera cam = Camera.main;
                 if (cam == null) return;
 
-                Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+                Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
                 if (Physics.Raycast(ray, out RaycastHit hit, 500f, ~0, QueryTriggerInteraction.Ignore))
                 {
@@ -441,58 +500,250 @@ namespace ScheduleIMod
         }
 
         // ======================
-        // GUI + MENÜ
+        // GUI
         // ======================
         public override void OnGUI()
         {
+            if (Event.current.type == EventType.Layout || Event.current.type == EventType.Repaint)
+            {
+                ApplySkin();
+                InitStylesIfNeeded();
+            }
+
             if (!showGUI)
             {
                 if (npcEspEnabled)
                     DrawNPCESP();
+                    DrawOverlay();
 
                 return;
             }
 
-            ApplySkin();
-
-            windowRect = GUI.Window(1, windowRect, DrawWindow, "Schedule I Mod Menu");
+            // Draw window
+            windowRect = GUI.Window(1, windowRect, DrawWindow, GUIContent.none);
 
             if (npcEspEnabled)
                 DrawNPCESP();
         }
 
+        // ======================
+        // FPS COUNTER + KEYBIND OVERLAY
+        // ======================
+
+        private float fpsDeltaTime = 0.0f;
+
+        public override void OnLateUpdate()
+        {
+            // FPS calculation
+            fpsDeltaTime += (Time.unscaledDeltaTime - fpsDeltaTime) * 0.1f;
+        }
+
+        // Draw overlay elements ON TOP of everything
+        private void DrawOverlay()
+        {
+            DrawFPSCounter();
+            DrawKeybindHelper();
+        }
+
+
+        // ---------------- FPS COUNTER (Top-Right) ----------------
+        private void DrawFPSCounter()
+        {
+            float fps = 1.0f / fpsDeltaTime;
+            string text = $"{fps:0} FPS";
+
+            GUIStyle style = new GUIStyle(GUI.skin.label);
+            style.fontSize = 18;
+            style.normal.textColor = Color.cyan;
+            style.fontStyle = FontStyle.Bold;
+            style.alignment = TextAnchor.UpperRight;
+
+            GUI.color = new Color(0, 0, 0, 0.35f);
+            GUI.DrawTexture(new Rect(Screen.width - 140, 10, 130, 32), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+
+            GUI.Label(new Rect(Screen.width - 140, 10, 130, 32), text, style);
+        }
+
+
+        // ---------------- KEYBIND HELP BOX (Top-Left) ----------------
+        private void DrawKeybindHelper()
+        {
+            List<string> lines = new List<string>();
+
+            lines.Add("F1 - Toggle Menu");
+
+            if (onePunchEnabled)
+                lines.Add("LMB - One Punch");
+
+            if (mindControlEnabled)
+                lines.Add("MMB - Pet NPC");
+
+            if (blackHoleEnabled)
+                lines.Add("B - Black Hole");
+
+            if (deleteNpcEnabled)
+                lines.Add("X - Delete NPC");
+
+            if (throwbackEnabled)
+                lines.Add("RMB - Throw NPC");
+
+            if (lines.Count == 0)
+                return;
+
+            float boxWidth = 210;
+            float lineHeight = 22;
+            float boxHeight = lineHeight * lines.Count + 10;
+
+            // Background
+            GUI.color = new Color(0, 0, 0, 0.45f);
+            GUI.DrawTexture(new Rect(10, 10, boxWidth, boxHeight), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+
+            // Border
+            DrawBorder(new Rect(10, 10, boxWidth, boxHeight), 2, Color.cyan);
+
+            // Text
+            GUIStyle style = new GUIStyle(GUI.skin.label);
+            style.fontSize = 14;
+            style.normal.textColor = Color.white;
+            style.alignment = TextAnchor.MiddleLeft;
+
+            float y = 15;
+            foreach (string line in lines)
+            {
+                GUI.Label(new Rect(20, y, boxWidth - 20, lineHeight), line, style);
+                y += lineHeight;
+            }
+        }
+
+
+        // Draw box border
+        private void DrawBorder(Rect rect, int thickness, Color color)
+        {
+            GUI.color = color;
+
+            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, thickness), Texture2D.whiteTexture); // Top
+            GUI.DrawTexture(new Rect(rect.x, rect.yMax - thickness, rect.width, thickness), Texture2D.whiteTexture); // Bottom
+            GUI.DrawTexture(new Rect(rect.x, rect.y, thickness, rect.height), Texture2D.whiteTexture); // Left
+            GUI.DrawTexture(new Rect(rect.xMax - thickness, rect.y, thickness, rect.height), Texture2D.whiteTexture); // Right
+
+            GUI.color = Color.white;
+        }
+
+
         private void DrawWindow(int id)
         {
+            // Dark background for the whole window
+            GUI.DrawTexture(new Rect(0, 0, windowRect.width, windowRect.height), darkerBgTex);
+
+            // Header
+            GUILayout.BeginVertical(tabHeaderStyle);
+            GUILayout.Space(4);
+            GUILayout.Label("SCHEDULE I – MOD MENU", headerLabelStyle);
+            GUILayout.Space(4);
+            GUILayout.EndVertical();
+
+            GUILayout.Space(4);
+
             GUILayout.BeginHorizontal();
 
-            GUILayout.BeginVertical(GUILayout.Width(160));
+            // Sidebar – fixed width
+            GUILayout.BeginVertical(GUILayout.Width(170));
             DrawSidebar();
             GUILayout.EndVertical();
 
-            GUILayout.BeginVertical(GUILayout.Width(560));
+            // Content – flexible width
+            GUILayout.BeginVertical();
             DrawSelectedTab();
             GUILayout.EndVertical();
 
             GUILayout.EndHorizontal();
 
-            GUI.DragWindow();
+            // Draw resize handle (bottom-right)
+            DrawResizeHandle();
+
+            // Make the header draggable (excluding the resize corner)
+            GUI.DragWindow(new Rect(0, 0, windowRect.width - 24f, 24f));
         }
 
         // ======================
-        // SIDEBAR – KATEGÓRIÁK
+        // RESIZE HANDLE
+        // ======================
+        private void DrawResizeHandle()
+        {
+            Event e = Event.current;
+
+            Rect handleRect = new Rect(
+                windowRect.width - 18f,
+                windowRect.height - 18f,
+                16f,
+                16f
+            );
+
+            // Small diagonal triangle-ish handle
+            GUI.DrawTexture(handleRect, resizeHandleTex);
+
+            switch (e.type)
+            {
+                case EventType.MouseDown:
+                    if (e.button == 0 && handleRect.Contains(e.mousePosition))
+                    {
+                        isResizing = true;
+                        resizeStartMouse = e.mousePosition;
+                        resizeStartSize = new Vector2(windowRect.width, windowRect.height);
+                        e.Use();
+                    }
+                    break;
+
+                case EventType.MouseDrag:
+                    if (isResizing && e.button == 0)
+                    {
+                        Vector2 delta = e.mousePosition - resizeStartMouse;
+
+                        float newWidth = Mathf.Clamp(resizeStartSize.x + delta.x, MinWindowWidth, Screen.width);
+                        float newHeight = Mathf.Clamp(resizeStartSize.y + delta.y, MinWindowHeight, Screen.height);
+
+                        windowRect.width = newWidth;
+                        windowRect.height = newHeight;
+
+                        e.Use();
+                    }
+                    break;
+
+                case EventType.MouseUp:
+                    if (isResizing && e.button == 0)
+                    {
+                        isResizing = false;
+                        e.Use();
+                    }
+                    break;
+            }
+        }
+
+        // ======================
+        // SIDEBAR – CATEGORIES
         // ======================
         private void DrawSidebar()
         {
-            GUILayout.Label("<b>Categories</b>", labelStyle);
+            GUILayout.Label("<b>CATEGORIES</b>", labelStyle);
+            GUILayout.Space(4);
 
-            if (GUILayout.Button("Player")) selectedTab = 0;
-            if (GUILayout.Button("Money")) selectedTab = 1;
-            if (GUILayout.Button("NPC")) selectedTab = 2;
-            if (GUILayout.Button("ESP")) selectedTab = 3;
-            if (GUILayout.Button("Utility")) selectedTab = 4;
-            if (GUILayout.Button("UI Skin")) selectedTab = 5;
-            if (GUILayout.Button("Items")) selectedTab = 6;
-            if (GUILayout.Button("Products")) selectedTab = 7;
+            DrawSidebarButton("Player", 0);
+            DrawSidebarButton("Money", 1);
+            DrawSidebarButton("NPC", 2);
+            DrawSidebarButton("ESP", 3);
+            DrawSidebarButton("Utility", 4);
+            DrawSidebarButton("UI Skin", 5);
+            DrawSidebarButton("Items", 6);
+            DrawSidebarButton("Products", 7);
+        }
+
+        private void DrawSidebarButton(string title, int tabIndex)
+        {
+            GUIStyle style = selectedTab == tabIndex ? sidebarActiveButtonStyle : sidebarButtonStyle;
+            if (GUILayout.Button(title, style))
+                selectedTab = tabIndex;
         }
 
         private void DrawSelectedTab()
@@ -518,6 +769,7 @@ namespace ScheduleIMod
             GUILayout.Label("<size=16><b>Player Movement</b></size>", labelStyle);
             GUILayout.Space(10);
 
+            // ----- Movement -----
             GUILayout.Label($"Walk Speed: {walkSpeed:F1}");
             walkSpeed = GUILayout.HorizontalSlider(walkSpeed, 1f, 50f);
             if (GUILayout.Button("Apply Speed"))
@@ -535,7 +787,29 @@ namespace ScheduleIMod
                 PlayerMovement.JumpMultiplier = jumpMultiplier;
                 MelonLogger.Msg($"JumpMultiplier set to {jumpMultiplier}");
             }
+
+            GUILayout.Space(25);
+            GUILayout.Label("<size=14><b>Player Health</b></size>", labelStyle);
+            GUILayout.Space(5);
+
+            var health = GetPlayerHealth();
+            GUILayout.Label($"Health: {health:0}/{PlayerHealth.MAX_HEALTH:0}");
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Heal to Full", GUILayout.Width(120)))
+            {
+                HealPlayerFull();
+                MelonLogger.Msg("[Health] Healed player to full.");
+            }
+
+            if (GUILayout.Button("Kill Player", GUILayout.Width(120)))
+            {
+                KillPlayer();
+                MelonLogger.Msg("[Health] Killed player.");
+            }
+            GUILayout.EndHorizontal();
         }
+
 
         // ======================
         // MONEY TAB
@@ -545,7 +819,7 @@ namespace ScheduleIMod
             GUILayout.Label("<size=16><b>Money Editor</b></size>", labelStyle);
             GUILayout.Space(10);
 
-            GUILayout.Label("Give Money:");
+            GUILayout.Label("Give Money:", labelStyle);
             moneyInput = GUILayout.TextField(moneyInput, 10);
 
             if (GUILayout.Button("Apply"))
@@ -586,17 +860,17 @@ namespace ScheduleIMod
 
             GUILayout.Space(10);
 
-            GUILayout.Label($"Throw Force: {throwForce:F0}");
+            GUILayout.Label($"Throw Force: {throwForce:F0}", labelStyle);
             throwForce = GUILayout.HorizontalSlider(throwForce, 1f, 300f);
 
-            GUILayout.Label($"Throw Cooldown: {throwCooldown:0.00} s");
+            GUILayout.Label($"Throw Cooldown: {throwCooldown:0.00} s", labelStyle);
             throwCooldown = GUILayout.HorizontalSlider(throwCooldown, 0f, 1f);
 
             GUILayout.Space(10);
 
             if (brainOverrideEnabled)
             {
-                GUILayout.Label("Brain Mode:");
+                GUILayout.Label("Brain Mode:", labelStyle);
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button("Normal")) SetBrainMode(BrainMode.Normal);
                 if (GUILayout.Button("Frozen")) SetBrainMode(BrainMode.Frozen);
@@ -625,18 +899,22 @@ namespace ScheduleIMod
 
             npcEspEnabled = GUILayout.Toggle(
                 npcEspEnabled,
-                " NPC ESP (Name + Dist + Box + HP)\nPets = cyan, normál NPC = green"
+                " NPC ESP (Name + Distance + Box + HP)\nPets = cyan, normal NPC = green"
             );
         }
 
         // ======================
         // UTILITY TAB
         // ======================
+        private static bool godMode = false;
+        private static bool freezeTime = false;
+
         private void DrawUtilityTab()
         {
             GUILayout.Label("<size=16><b>Utility</b></size>", labelStyle);
-            GUILayout.Space(20);
+            GUILayout.Space(15);
 
+            // === SAVE GAME ===
             if (GUILayout.Button("Save Game Now"))
             {
                 try
@@ -649,7 +927,45 @@ namespace ScheduleIMod
                     MelonLogger.Warning("Save failed: " + ex.Message);
                 }
             }
+
+            GUILayout.Space(10);
+
+            // === FREEZE TIME ===
+            if (GUILayout.Button(freezeTime ? "Unfreeze Time" : "Freeze Time"))
+            {
+                freezeTime = !freezeTime;
+
+                NPCMovement[] npcs = GameObject.FindObjectsOfType<NPCMovement>();
+                foreach (var m in npcs)
+                {
+                    if (m == null) continue;
+                    m.MoveSpeedMultiplier = freezeTime ? 0f : 1f;
+                }
+
+                MelonLogger.Msg("Freeze Time = " + freezeTime);
+            }
+
+            GUILayout.Space(10);
+
+            // === RESTART SCENE ===
+            if (GUILayout.Button("Restart Scene"))
+            {
+                MelonLogger.Msg("Restarting scene...");
+                UnityEngine.SceneManagement.SceneManager.LoadScene(
+                    UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
+                );
+            }
+
+            GUILayout.Space(10);
+
+            // === QUIT GAME ===
+            if (GUILayout.Button("Quit Game"))
+            {
+                MelonLogger.Msg("Quitting game...");
+                Application.Quit();
+            }
         }
+
 
         // ======================
         // SKINS TAB
@@ -675,12 +991,12 @@ namespace ScheduleIMod
             var pm = NetworkSingleton<ProductManager>.Instance;
             if (pm == null)
             {
-                GUILayout.Label("ProductManager not available (not in this scene?)");
+                GUILayout.Label("ProductManager not available (not in this scene?)", labelStyle);
                 return;
             }
 
             // Quantity slider
-            GUILayout.Label($"Quantity: {productQuantity}");
+            GUILayout.Label($"Quantity: {productQuantity}", labelStyle);
             productQuantity = (int)GUILayout.HorizontalSlider(productQuantity, 1, 500);
 
             GUILayout.Space(10);
@@ -691,12 +1007,12 @@ namespace ScheduleIMod
 
             GUILayout.Space(10);
 
-            GUILayout.Label("Search:");
+            GUILayout.Label("Search:", labelStyle);
             productSearch = GUILayout.TextField(productSearch, 50);
 
             GUILayout.Space(10);
 
-            productScrollPos = GUILayout.BeginScrollView(productScrollPos, GUILayout.Width(550), GUILayout.Height(300));
+            productScrollPos = GUILayout.BeginScrollView(productScrollPos, GUILayout.Height(300));
 
             List<ProductDefinition> products = pm.AllProducts;
             string searchLower = string.IsNullOrEmpty(productSearch) ? null : productSearch.ToLower();
@@ -731,7 +1047,7 @@ namespace ScheduleIMod
                 GUILayout.BeginVertical();
                 GUILayout.Label("<b>" + prod.Name + "</b>", labelStyle);
                 GUILayout.Label("<size=11>" + prod.ID + "</size>");
-                GUILayout.Label($"Type: {prod.DrugType}   BaseValue: {prod.MarketValue}");
+                GUILayout.Label($"Type: {prod.DrugType}   BaseValue: {prod.MarketValue}", labelStyle);
                 GUILayout.EndVertical();
 
                 GUILayout.FlexibleSpace();
@@ -771,7 +1087,7 @@ namespace ScheduleIMod
                     EquipItemViaInventory(prod);
                 }
 
-                // DISCOVER (csak discovered-be teszi, autoList=false)
+                // DISCOVER (server-side), autoList = false
                 if (GUILayout.Button("Discover", GUILayout.Width(80)))
                 {
                     try
@@ -785,7 +1101,7 @@ namespace ScheduleIMod
                     }
                 }
 
-                // HIDE (eltávolítjuk a discovered + listed listákból local szinten)
+                // HIDE (local only)
                 if (GUILayout.Button("Hide", GUILayout.Width(80)))
                 {
                     ProductManager.DiscoveredProducts.Remove(prod);
@@ -900,13 +1216,13 @@ namespace ScheduleIMod
             GUILayout.Space(10);
 
             // Search bar
-            GUILayout.Label("Search:");
+            GUILayout.Label("Search:", labelStyle);
             itemSearch = GUILayout.TextField(itemSearch, 50);
 
             GUILayout.Space(5);
 
-            // Quantity slider (Give-hez)
-            GUILayout.Label($"Quantity (Give): {itemQuantity}");
+            // Quantity slider (for Give)
+            GUILayout.Label($"Quantity (Give): {itemQuantity}", labelStyle);
             itemQuantity = (int)GUILayout.HorizontalSlider(itemQuantity, 1, 50);
 
             GUILayout.Space(10);
@@ -947,7 +1263,7 @@ namespace ScheduleIMod
             GUILayout.Space(10);
 
             // Item list (scrollable)
-            itemScrollPos = GUILayout.BeginScrollView(itemScrollPos, GUILayout.Width(550), GUILayout.Height(300));
+            itemScrollPos = GUILayout.BeginScrollView(itemScrollPos, GUILayout.Height(300));
 
             foreach (var pair in allItemDefs)
             {
@@ -968,7 +1284,8 @@ namespace ScheduleIMod
 
                 GUILayout.BeginHorizontal("box");
 
-                GUILayout.Label(def.Icon != null ? def.Icon.texture : Texture2D.blackTexture, GUILayout.Width(40), GUILayout.Height(40));
+                GUILayout.Label(def.Icon != null ? def.Icon.texture : Texture2D.blackTexture,
+                    GUILayout.Width(40), GUILayout.Height(40));
 
                 GUILayout.BeginVertical();
                 GUILayout.Label("<b>" + def.Name + "</b>", labelStyle);
@@ -998,7 +1315,7 @@ namespace ScheduleIMod
                     SpawnPickup(def);
                 }
 
-                // EQUIP (inventory + automata equip)
+                // EQUIP
                 if (GUILayout.Button("Equip", GUILayout.Width(60)))
                 {
                     EquipItemViaInventory(def);
@@ -1010,25 +1327,130 @@ namespace ScheduleIMod
             GUILayout.EndScrollView();
         }
 
+        // ======================
+        // SKIN / STYLES
+        // ======================
         private void ApplySkin()
         {
-            labelStyle = new GUIStyle(GUI.skin.label) { richText = true };
-
             switch (currentSkin)
             {
                 case SkinType.Classic:
                     GUI.backgroundColor = Color.white;
                     GUI.contentColor = Color.black;
                     break;
+
                 case SkinType.Dark:
-                    GUI.backgroundColor = new Color(0.15f, 0.15f, 0.15f);
-                    GUI.contentColor = Color.white;
+                    GUI.backgroundColor = new Color(0.14f, 0.14f, 0.16f);
+                    GUI.contentColor = new Color(0.85f, 0.85f, 0.9f);
                     break;
+
                 case SkinType.Neon:
-                    GUI.backgroundColor = new Color(0f, 0.8f, 0.1f);
-                    GUI.contentColor = Color.black;
+                    GUI.backgroundColor = new Color(0.02f, 0.15f, 0.08f);
+                    GUI.contentColor = new Color(0.7f, 1f, 0.7f);
                     break;
             }
+        }
+
+        private void InitStylesIfNeeded()
+        {
+            if (labelStyle != null) return;
+
+            darkBgTex = MakeTex(new Color(0.16f, 0.16f, 0.18f, 0.98f));
+            darkerBgTex = MakeTex(new Color(0.09f, 0.09f, 0.11f, 0.98f));
+            accentTex = MakeTex(new Color(0.22f, 0.5f, 0.96f, 1f));
+            resizeHandleTex = MakeDiagonalHandleTex();
+
+            labelStyle = new GUIStyle(GUI.skin.label)
+            {
+                richText = true,
+                normal = { textColor = GUI.contentColor }
+            };
+
+            headerLabelStyle = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = 15,
+                fontStyle = FontStyle.Bold,
+                richText = true,
+                normal = { textColor = new Color(0.9f, 0.9f, 0.95f) }
+            };
+
+            tabHeaderStyle = new GUIStyle(GUI.skin.box)
+            {
+                padding = new RectOffset(8, 8, 4, 4),
+                normal = { background = darkBgTex }
+            };
+
+            sidebarButtonStyle = new GUIStyle(GUI.skin.button)
+            {
+                alignment = TextAnchor.MiddleLeft,
+                padding = new RectOffset(10, 10, 4, 4),
+                margin = new RectOffset(0, 0, 2, 2),
+                normal =
+                {
+                    textColor = new Color(0.85f, 0.85f, 0.9f),
+                    background = darkBgTex
+                },
+                hover =
+                {
+                    textColor = Color.white,
+                    background = accentTex
+                },
+                active =
+                {
+                    textColor = Color.white,
+                    background = accentTex
+                }
+            };
+
+            sidebarActiveButtonStyle = new GUIStyle(sidebarButtonStyle)
+            {
+                normal =
+                {
+                    textColor = Color.white,
+                    background = accentTex
+                }
+            };
+
+            espStyle = new GUIStyle
+            {
+                fontSize = 14,
+                alignment = TextAnchor.MiddleCenter,
+                normal = { textColor = Color.white }
+            };
+        }
+
+        private Texture2D MakeTex(Color color)
+        {
+            Texture2D tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            tex.SetPixel(0, 0, color);
+            tex.Apply();
+            return tex;
+        }
+
+        private Texture2D MakeDiagonalHandleTex()
+        {
+            const int size = 16;
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+
+            Color clear = new Color(0, 0, 0, 0);
+            Color line = new Color(0.7f, 0.7f, 0.75f, 0.8f);
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    tex.SetPixel(x, y, clear);
+                }
+            }
+
+            for (int i = 0; i < size; i += 3)
+            {
+                tex.SetPixel(size - 1 - i, i, line);
+            }
+
+            tex.Apply();
+            return tex;
         }
 
         // ======================
@@ -1097,10 +1519,10 @@ namespace ScheduleIMod
                     return;
                 }
 
-                // Beletesszük az inventoryba
+                // Add to inventory
                 inv.AddItemToInventory(inst);
 
-                // Megkeressük, melyik slotban van
+                // Find which hotbar slot it was placed in
                 var slots = inv.hotbarSlots;
                 int index = -1;
                 for (int i = 0; i < slots.Count; i++)
@@ -1119,7 +1541,7 @@ namespace ScheduleIMod
                     return;
                 }
 
-                // Ha már volt valami equipelve, unequip
+                // If something is already equipped, unequip it
                 if (inv.EquippedSlotIndex >= 0 &&
                     inv.EquippedSlotIndex < slots.Count &&
                     slots[inv.EquippedSlotIndex] != null)
@@ -1127,10 +1549,10 @@ namespace ScheduleIMod
                     slots[inv.EquippedSlotIndex].Unequip();
                 }
 
-                // Equip hívása
+                // Equip new item
                 slots[index].Equip();
 
-                // Protected setter megkerülése reflektálással
+                // Set EquippedSlotIndex via reflection
                 PropertyInfo prop = typeof(PlayerInventory).GetProperty(
                     "EquippedSlotIndex",
                     BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -1190,9 +1612,12 @@ namespace ScheduleIMod
         {
             if (espStyle == null)
             {
-                espStyle = new GUIStyle();
-                espStyle.fontSize = 14;
-                espStyle.alignment = TextAnchor.MiddleCenter;
+                espStyle = new GUIStyle
+                {
+                    fontSize = 14,
+                    alignment = TextAnchor.MiddleCenter,
+                    normal = { textColor = Color.white }
+                };
             }
 
             Camera cam = Camera.main;
