@@ -1,117 +1,124 @@
-# Schedule I – Sample Mod Menu
-A fully-featured **MelonLoader mod menu** for *Schedule I*, designed for development, debugging, 
-reverse engineering, and gameplay experimentation.  
-This project demonstrates advanced interaction with internal game systems including:
-NPC logic, item frameworks, player controllers, product definitions, and runtime UI manipulation.
+# Schedule I – Advanced Mod Menu
+A fully-featured **MelonLoader mod menu** for *Schedule I*, created for development, debugging, modding, reverse engineering, and gameplay sandboxing.
+
+This version introduces a redesigned modern UI system, improved NPC tools, polished item/product features, FPS counter, and keybind helper.
 
 ---
 
 ## 🚀 Features
 
 ### 🧠 NPC Manipulation
-- **One Punch Kill** – Instantly kill NPCs with LMB
-- **Throwback NPC** – Ragdoll & launch NPCs using RMB (force slider included)
-- **Pet Mode (Mind Control)** – Middle-click an NPC to turn it into a follower  
-  → Click again to remove  
-  → Pet NPCs appear *cyan* in ESP
-- **Black Hole Ability** – Create a gravity well that pulls NPCs in and destroys them
-- **Brain Override** – Freeze, Panic, or Normalize enemy AI speed multipliers
-- **Delete NPC** – Remove NPC with X key  
-- **Nuke All NPCs** – Instantly kill every NPC in the scene  
-- **Revive All NPCs** – Reset all NPCs back to life
+- **One Punch Kill** – Instantly kill NPCs using LMB  
+- **Throwback NPC** – Ragdoll + launch NPCs with RMB (force & cooldown sliders)  
+- **Pet Mode (Mind Control)** – Toggle an NPC as a follower with MMB  
+  - Pet NPCs show as **cyan** in ESP  
+- **Black Hole Ability** – Creates a gravitational sphere that kills nearby NPCs  
+- **Brain Override** – Freeze, Panic (3× speed), or reset all AI  
+- **Delete NPC (X)** – Removes any NPC you aim at  
+- **Nuke All NPCs** – Instantly kills all NPCs in the scene  
+- **Revive All NPCs** – Fully revives every NPC  
 
 ---
 
-## 🔍 ESP System
-A clean, optimized ESP renderer over Unity GUI:
-- NPC Name
-- Distance in meters
-- Health bar (with HP %)
-- Bounding box
-- Distinguishes **pets (cyan)** and **normal NPCs (green)**  
-- Scans NPCs dynamically (refresh every 0.2 sec)
+## 🔍 ESP System (Optimized)
+Custom IMGUI-based ESP:
+- NPC name  
+- Distance  
+- HP bar  
+- Box outlines  
+- Color-coded pets (cyan)  
+- Refresh rate: **0.2s**  
 
 ---
 
 ## 🎁 Item Spawner
-Supports all `ItemDefinition` assets loaded in Resources:
-- Search by name or ID
-- Category filtering
-- Give item (N quantity)
-- Drop item into the world (spawn real ItemPickup)
-- Auto-equip item (via inventory reflection workaround)
+Loads all `ItemDefinition` assets:
+- Search bar  
+- Category filters  
+- Give items (custom quantity)  
+- **Drop real item pickups** into the world  
+- Auto-equip via reflection bypass  
 
 ---
 
 ## 🧪 Product Spawner
-Full control over `ProductDefinition` objects:
-- Give / Drop / Equip products
-- Search by ID or name
-- Quantity slider
-- **Discover product**
-- **Hide product**
-- **List / Delist product**
-- Bulk tools:
-  - Discover ALL
-  - Hide ALL
-  - List ALL
-  - Delist ALL
+Full control over `ProductDefinition`:
+- Give / Drop / Equip  
+- List / Delist  
+- Discover / Hide  
+- Search by ID/name  
+- Bulk actions:  
+  - Discover All  
+  - Hide All  
+  - List All  
+  - Delist All  
 
 ---
 
-## 🧍 Player Modifiers
+## 🧍 Player Tools
 - Walk speed slider  
-- Jump multiplier slider  
-- F1 hotkey to toggle UI  
-- Includes Classic, Dark Mode, and Neon UI skins  
+- Jump multiplier  
+- Modify health (Set/Heal/Zero)  
+- F1 → Toggle menu visibility  
 
 ---
 
 ## 💰 Money Tools
-- Modify cash instantly via `MoneyManager.ChangeCashBalance()`
+- Instant cash modification using `MoneyManager.ChangeCashBalance()`  
 
 ---
 
-## 🛠 Utility
-- Manual **Save Game** (calls Schedule I SaveManager)
-- Debug logs for every major action
+## ⚙️ Utility
+- **Save Game**  
+- **Quit Game**  
+- **FPS Counter** (top-right)  
+- **Keybind Helper** window  
+- Extra debugging helpers  
+
+---
+
+## 🎨 UI & Styling
+Modern IMGUI menu:
+- Classic / Dark / Neon skins  
+- Draggable window  
+- Corner-based window resizing  
+- Clean, organized layout  
 
 ---
 
 ## 📦 Installation
 
-1. Install **MelonLoader 0.6.x**
-2. Build the project in **Release**
-3. Copy output DLL: into: Schedule I/GameFolder/Mods/
+1. Install **MelonLoader 0.6.x**  
+2. Build this project in **Release**  
+3. Copy the DLL into:  Schedule I/Mods/
 4. Launch the game  
-5. Press **F1** to open the menu
+5. Press **F1** to open/close the menu  
 
 ---
 
 ## 🧬 Technical Notes
 
-### Uses:
-- Runtime reflection to bypass protected inventory setters  
-- IMGUI-based rendering for ESP & menu  
-- Raycast-based NPC picking  
-- Dynamic resource scanning for ItemDefinition / ProductDefinition  
-- Custom spawning of ItemPickup clones with overridden metadata  
+### Internals Used
+- PlayerHealth internal APIs (SetHealth, Revive, Die)  
+- Reflection to bypass protected inventory setters  
+- ESP rendering with GUI primitives  
+- Full item/product resource scanning  
+- Raycast-based NPC controls  
+- Safe fallbacks for missing components  
 
-### Compatible with:
-- MelonLoader
-- Schedule I IL2CPP build
-- FishNet runtime
-- Unity 2021.x internal classes
+### Compatible With
+- MelonLoader  
+- Schedule I (IL2CPP)  
+- Unity 2021.x  
+- FishNet networking  
 
 ---
 
-## 📜 Disclaimer
-
-This software is provided **strictly for educational, debugging, and research purposes**.  
-Do **not** use in online environments, competitive scenarios, or to harm the intended gameplay experience.  
-You are responsible for ensuring compliance with all applicable terms and laws.
+## ⚠️ Disclaimer
+This project is for **educational, debugging, and research purposes only**.  
+Do not use it online or in any disruptive scenario. You are responsible for your actions.
 
 ---
 
 ## ⭐ Credits
-Mod Menu development, reverse engineering, and research by **Kristóf (Kristof6769)**
+Mod Menu Development: **Kristóf (Kristof6769)**
