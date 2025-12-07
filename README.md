@@ -98,6 +98,43 @@ Modern IMGUI menu:
 
 ## 🧬 Technical Notes
 
+---
+
+## 🔓 Bypassed Systems
+
+This mod bypasses several internal restrictions from Schedule I to allow full sandbox access:
+
+### ✔ Inventory Restrictions
+- Bypassed protected `EquippedSlotIndex` setter (reflection)
+- Equip-anywhere logic unlocked
+- Restricted items can be forced into hotbar
+
+### ✔ Item & Product Restrictions
+- Product discovery limits fully bypassed
+- Product listing delist restrictions removed
+- Items/products can be dropped or equipped regardless of legality
+- Forced spawn of ItemPickup clones using template duplication
+
+### ✔ Player Restrictions
+- Local player can revive without server permissions
+- Full heal / set health bypass
+- Movement stats (walk/jump) unrestricted
+
+### ✔ NPC Restrictions
+- AI MoveSpeedMultiplier override
+- Forced ragdoll activation on NPCs
+- Mind-control mode bypasses AI ownership
+- Delete-any-NPC ability, no server validation
+
+### ✔ Money Restrictions
+- Unlimited money editing via direct `MoneyManager.ChangeCashBalance` call
+
+### ✔ UI / Engine Restrictions
+- IMGUI rendering on top of Schedule I locked UI layers
+- Hotkey-based menu bypassing internal UI input locks
+
+This list updates as new bypass techniques are added.
+
 ### Internals Used
 - PlayerHealth internal APIs (SetHealth, Revive, Die)  
 - Reflection to bypass protected inventory setters  
